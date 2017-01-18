@@ -24,11 +24,11 @@ object List { // `List` companion object. Contains functions for creating and wo
     else Cons(as.head, apply(as.tail: _*))
 
   val xl = List(1,2,3,4,5) match {
-    case Cons(x, Cons(2, Cons(4, _))) => x
-    case Nil => 42
-    case Cons(x, Cons(y, Cons(3, Cons(4, _)))) => x + y
-    case Cons(h, t) => h + sum(t)
-    case _ => 101
+    case Cons(x, Cons(2, Cons(4, _))) => x // Not a match since 4 is third in the pattern, where 3 is expected.
+    case Nil => 42 // Not a match since the List is not empty.
+    case Cons(x, Cons(y, Cons(3, Cons(4, _)))) => x + y // Match; first two values are 1 for x and 2 for y, which are added producing 3.
+    case Cons(h, t) => h + sum(t) // Not checked against since a previous match succeeded.
+    case _ => 101 // Not checked against since a previous match succeeded.
   }
 
   def append[A](a1: List[A], a2: List[A]): List[A] =
@@ -68,6 +68,16 @@ object List { // `List` companion object. Contains functions for creating and wo
     case (Cons(h, t), _) => drop(t, n - 1)
   }
 
+  //  @annotation.tailrec
+  //  def drop[A](l: List[A], n: Int): List[A] = l match {
+  //    case Nil => Nil
+  //    case Cons(h, t) =>
+  //      if (n == 0)
+  //        l
+  //      else
+  //        drop(t, n - 1)
+  //  }
+
   @annotation.tailrec
   def dropWhile[A](l: List[A], f: A => Boolean): List[A] = l match {
     case Cons(h, t) if f(h) =>
@@ -77,10 +87,31 @@ object List { // `List` companion object. Contains functions for creating and wo
   }
 
   def init[A](l: List[A]): List[A] = l match {
-    case Nil => Nil
-    case Cons(_, Nil) => Nil
+    case Nil | Cons(_, Nil) => Nil
+    //    case Nil => Nil
+    //    case Cons(_, Nil) => Nil
     case Cons(h, t) => Cons(h, init(t))
   }
+
+  /*
+   Exercise 3.7
+   Can product, implemented using foldRight, immediately halt the recursion and return 0.0 if it
+   encounters a 0.0? Why or why not?
+
+   No. The decision to halt recursion early would have to be performed in foldRight based on
+   the value of a particular element in the list. No such provision resides in foldRight.
+   Execution occurs over the entire list regardless of the value of any particular item.
+  */
+
+  /*
+    Exercise 3.8
+    See what happens when you pass Nil and Cons themselves to foldRight, like this:
+    foldRight(List(1,2,3), Nil:List[Int])(Cons(_,_)). What do you think this
+    says about the relationship between foldRight and the data constructors of List?
+
+    This invocation of foldRight will just reproduce the list. This makes me think that
+    at least some of the List data constructors use foldRight.
+  */
 
   def length[A](l: List[A]): Int =
     foldRight(l, 0)((_, acc) => acc + 1)
@@ -89,6 +120,49 @@ object List { // `List` companion object. Contains functions for creating and wo
     case Nil => z
     case Cons(h, t) => foldLeft(t, f(z, h))(f)
   }
+
+  def sumUsingFoldLeft[A](l: List[Int]): Int = foldLeft(l, 0)(_ + _)
+
+  def productUsingFoldLeft[A](l: List[Double]): Double = foldLeft(l, 1.0)(_ * _)
+
+  def lengthUsingFoldLeft[A](l: List[A]): Int = foldLeft(l, 0)((acc, _) => acc + 1)
+
+  def reverse[A](l: List[A]): List[A] =
+    foldLeft(l, Nil: List[A])((acc, x) => Cons(x, acc))
+
+  /*
+    Exercise 3.13
+    Hard: Can you write foldLeft in terms of foldRight? How about the other way
+    around? Implementing foldRight via foldLeft is useful because it lets us implement
+    foldRight tail-recursively, which means it works even for large lists without overflowing
+    the stack.
+
+    To implement foldRight in terms of foldLeft, first reverse the input list then use a lambda
+    which transposes the parameters and then calls the passed lambda. I don't think foldLeft can
+    be implemented in terms of foldRight for the same reasons as the answer to exercise 3.10.
+    I've considered a method where rather than passing the result of the function application,
+    a by-name (lazy) wrapper function could be passed, but that exchanges heavy usage of the stack
+    for heavy usage in the heap. I think that if performance is a desire, then a List is not likely
+    the best structure to use.
+  */
+
+  def appendUsingFoldRight[A](a1: List[A], a2: List[A]): List[A] =
+    foldRight(a1, a2)(Cons(_, _))
+
+  def flatten[A](xss: List[List[A]]): List[A] = {
+    val rl = reverse(xss)
+    foldLeft(rl, Nil: List[A])((a, b) => (a, b) match {
+      case (l, Nil) => l
+      case (Nil, l) => l
+      case (_, _) => append(b, a)
+    })
+  }
+
+  def mapInts(xs: List[Int]): List[Int] =
+    foldRight(xs, Nil: List[Int])((x, acc) => Cons(x + 1, acc))
+
+  def mapDoubles(xs: List[Double]): List[String] =
+    foldRight(xs, Nil: List[String])((x, acc) => Cons(x.toString, acc))
 
   def map[A,B](l: List[A])(f: A => B): List[B] =
     foldRight(l, Nil: List[B])((a, acc) => Cons(f(a), acc))
@@ -99,7 +173,7 @@ object List { // `List` companion object. Contains functions for creating and wo
   def flatMap[A,B](as: List[A])(f: A => List[B]): List[B] =
     foldRight(as, Nil:List[B])((a, l) => append(f(a), l))
 
-  def filter2[A](as: List[A])(f: A => Boolean): List[A] =
+  def filterUsingFlatMap[A](as: List[A])(f: A => Boolean): List[A] =
     flatMap(as)(a => if (f(a)) List(a) else Nil)
 
   def addLists(as: List[Int], bs: List[Int]): List[Int] ={
